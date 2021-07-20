@@ -15,9 +15,11 @@ impl Stats {
     }
 
     fn bytes_per_sec(&self) -> Option<f64> {
-        match self.duration {
-            0 => None,
-            _ => (self.number_of_bytes as f64) / self.duration.as_secs_f64(),
+        let secs = self.duration.as_secs_f64();
+        if secs < 0.001 {
+            None
+        } else {
+            Some(self.number_of_bytes as f64 / secs)
         }
     }
 }
