@@ -2,11 +2,22 @@ use std::io::{BufRead, BufReader, Error, ErrorKind};
 use reqwest::StatusCode;
 use std::time::{Duration, Instant};
 use std::sync::{Mutex, Arc};
+use thiserror::Error;
 
 #[derive(Debug, PartialEq)]
 struct Stats {
     duration: Duration,
     number_of_bytes: usize,
+}
+
+#[derive(Debug, Error)]
+enum CacheWarmerError
+{
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("HTTP error: {0}")]
+    Http(#[from] reqwest::Error),
 }
 
 impl Stats {
@@ -27,7 +38,7 @@ impl Stats {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), CacheWarmerError> {
     let first_arg = std::env::args().nth(1).ok_or(Error::new(ErrorKind::NotFound, "File name is missing"))?;
     println!("Args: {}", first_arg);
 
@@ -43,7 +54,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //urls.into_iter().for_each(fetch_status);
     for url in urls {
         let shared_stat = shared_stat.clone();
-        let thread = std::thread::spawn(move || -> Result<(), Box<dyn std::error::Error>> {
+        let thread = std::thread::spawn(move || -> Result<(), CacheWarmerError> {
             let stat = fetch_status(&url)?;
             shared_stat.lock().unwrap().aggregate(&stat);
             Ok(())
@@ -77,7 +88,7 @@ fn read_file(filename: &str) -> Result<Vec<String>, std::io::Error> {
 }
 
 //fn fetch_status(url: &String) -> Result<Stats, Box<dyn std::error::Error + Send>> {
-fn fetch_status(url: &String) -> Result<Stats, Box<dyn std::error::Error + Send>> {
+fn fetch_status(url: &String) -> Result<Stats, CacheWarmerError> {
     let start_time = Instant::now();
     let client = reqwest::blocking::Client::new();
     //let resp = client.get(url).send()?;
